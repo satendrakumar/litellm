@@ -1,10 +1,55 @@
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 import litellm
+
+
+@dataclass
+class MetricValidationError:
+    """Error for invalid metric name"""
+
+    metric_name: str
+    valid_metrics: Tuple[str, ...]
+
+    @property
+    def message(self) -> str:
+        return f"Invalid metric name: {self.metric_name}"
+
+
+@dataclass
+class LabelValidationError:
+    """Error for invalid labels on a metric"""
+
+    metric_name: str
+    invalid_labels: List[str]
+    valid_labels: List[str]
+
+    @property
+    def message(self) -> str:
+        return f"Invalid labels for metric '{self.metric_name}': {self.invalid_labels}"
+
+
+@dataclass
+class ValidationResults:
+    """Container for all validation results"""
+
+    metric_errors: List[MetricValidationError]
+    label_errors: List[LabelValidationError]
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.metric_errors or self.label_errors)
+
+    @property
+    def all_error_messages(self) -> List[str]:
+        messages = [error.message for error in self.metric_errors]
+        messages.extend([error.message for error in self.label_errors])
+        return messages
+
 
 REQUESTED_MODEL = "requested_model"
 EXCEPTION_STATUS = "exception_status"
@@ -71,6 +116,7 @@ class UserAPIKeyLabelNames(Enum):
     STATUS_CODE = "status_code"
     FALLBACK_MODEL = "fallback_model"
     ROUTE = "route"
+    MODEL_GROUP = "model_group"
 
 
 DEFINED_PROMETHEUS_METRICS = Literal[
@@ -161,7 +207,7 @@ class PrometheusMetricLabels:
     ]
 
     litellm_overhead_latency_metric = [
-        UserAPIKeyLabelNames.REQUESTED_MODEL.value,
+        UserAPIKeyLabelNames.MODEL_GROUP.value,
         UserAPIKeyLabelNames.API_PROVIDER.value,
         UserAPIKeyLabelNames.API_BASE.value,
         UserAPIKeyLabelNames.v2_LITELLM_MODEL_NAME.value,
@@ -170,7 +216,7 @@ class PrometheusMetricLabels:
     ]
 
     litellm_remaining_requests_metric = [
-        UserAPIKeyLabelNames.REQUESTED_MODEL.value,
+        UserAPIKeyLabelNames.MODEL_GROUP.value,
         UserAPIKeyLabelNames.API_PROVIDER.value,
         UserAPIKeyLabelNames.API_BASE.value,
         UserAPIKeyLabelNames.v2_LITELLM_MODEL_NAME.value,
@@ -179,7 +225,7 @@ class PrometheusMetricLabels:
     ]
 
     litellm_remaining_tokens_metric = [
-        UserAPIKeyLabelNames.REQUESTED_MODEL.value,
+        UserAPIKeyLabelNames.MODEL_GROUP.value,
         UserAPIKeyLabelNames.API_PROVIDER.value,
         UserAPIKeyLabelNames.API_BASE.value,
         UserAPIKeyLabelNames.v2_LITELLM_MODEL_NAME.value,
@@ -302,10 +348,25 @@ class PrometheusMetricLabels:
     @staticmethod
     def get_labels(label_name: DEFINED_PROMETHEUS_METRICS) -> List[str]:
         default_labels = getattr(PrometheusMetricLabels, label_name)
-        return default_labels + [
-            metric.replace(".", "_")
-            for metric in litellm.custom_prometheus_metadata_labels
-        ]
+        custom_labels = []
+
+        # Add custom metadata labels
+        custom_labels.extend(
+            [
+                metric.replace(".", "_")
+                for metric in litellm.custom_prometheus_metadata_labels
+            ]
+        )
+
+        # Add custom tags labels
+        custom_labels.extend(
+            [
+                f"tag_{tag}".replace("-", "_").replace(".", "_")
+                for tag in litellm.custom_prometheus_tags
+            ]
+        )
+
+        return default_labels + custom_labels
 
 
 from typing import List, Optional
@@ -334,6 +395,9 @@ class UserAPIKeyLabelValues(BaseModel):
     ] = None
     team_alias: Annotated[
         Optional[str], Field(..., alias=UserAPIKeyLabelNames.TEAM_ALIAS.value)
+    ] = None
+    model_group: Annotated[
+        Optional[str], Field(..., alias=UserAPIKeyLabelNames.MODEL_GROUP.value)
     ] = None
     requested_model: Annotated[
         Optional[str], Field(..., alias=UserAPIKeyLabelNames.REQUESTED_MODEL.value)
