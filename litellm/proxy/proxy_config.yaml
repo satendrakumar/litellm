@@ -2,18 +2,22 @@ model_list:
   - model_name: anthropic/*
     litellm_params:
       model: anthropic/*
-  - model_name: openai/*
+      api_key: os.environ/OPENAI_API_KEY_IJ
+  - model_name: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
     litellm_params:
-      model: openai/*
-
-  - model_name: vertex_ai/gemini-2.5-pro # Vertex AI Gemini
+      model: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
+  - model_name: bedrock/converse/us.anthropic.claude-sonnet-4-20250514-v1:0
     litellm_params:
-      model: vertex_ai/gemini-2.5-pro
-      thinking: {"type": "enabled", "budget_tokens": 1024}
-      merge_reasoning_content_in_choices: true
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-20250514-v1:0
 
-
+router_settings:
+  fallbacks: [
+    {"anthropic/claude-opus-4-20250514": 
+      {
+        "bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0"
+      }
+    }
+  ]
 litellm_settings:
   callbacks: ["datadog_llm_observability"]
-  cache: true
 
