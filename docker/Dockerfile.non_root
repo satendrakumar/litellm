@@ -28,6 +28,9 @@ RUN rm -rf dist/* && python -m build && \
 # Runtime Stage
 # -----------------
 FROM $LITELLM_RUNTIME_IMAGE AS runtime
+
+ENV GPG_KEY=
+
 WORKDIR /app
 
 # Install runtime dependencies
