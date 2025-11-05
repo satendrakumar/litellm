@@ -44,6 +44,7 @@ RUN pip install PyJWT==2.9.0 --no-cache-dir
 # Runtime stage
 FROM $LITELLM_RUNTIME_IMAGE AS runtime
 
+ENV GPG_KEY=
 # Ensure runtime stage runs as root
 USER root
 
