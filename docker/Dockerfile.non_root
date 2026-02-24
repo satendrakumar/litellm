@@ -9,6 +9,9 @@ ARG PROXY_EXTRAS_SOURCE=published
 FROM $LITELLM_BUILD_IMAGE AS builder
 ARG PROXY_EXTRAS_SOURCE
 WORKDIR /app
+
+ENV GPG_KEY=
+
 USER root
 
 # Install build dependencies with retry logic (includes node for UI build)
